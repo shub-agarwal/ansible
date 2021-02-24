@@ -1,0 +1,123 @@
+-
+  name: deploying ecom application on web server
+  hosts: web1,web2
+  become: yes
+  tasks:
+
+    -
+      name: Install firewalld and httpd
+      yum:
+        name: '{{item}}'
+        state: latest
+      loop:
+        - firewalld
+        - httpd, php, php-mysql
+
+    -
+      name: enable firewalld
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
+    -
+      name: add port
+      firewalld:
+        port: 80/tcp
+        permanent: true
+        zone: public
+        state: enabled
+    -
+      name: reload firewalld
+      systemd:
+        name: firewalld
+        state: reloaded
+    -
+      name: start httpd
+      service:
+        name: httpd
+        state: started
+    -
+      name: start httpd enable
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+    -
+      name: install git
+      yum:
+        name: git
+        state: latest
+    -
+      name: git clone
+      command: git clone https://github.com/kodekloudhub/learning-app-ecommerce.git /var/www/html/
+    -
+      name: test app
+      shell: curl http://localhost
+    -
+      name: update index.php
+      command: sed -i 's/172.20.1.101/'{{item}}'/g' /var/www/html/index.php
+      loop:
+        - server-ip
+-
+  name: install and configure mysql
+  hosts: db1
+  become: yes
+  tasks:
+    -
+      name: Install firewalld and mysql
+      yum:
+        name: '{{item}}'
+        state: latest
+      loop:
+        - firewalld
+        - mariadb-server
+        - MySQL-python
+    -
+      name: enable firewalld and mysql
+      service:
+        name: '{{item}}'
+        state: started
+        enabled: yes
+      loop:
+        - firewalld
+        - mariadb
+    -
+      name: add port
+      firewalld:
+        port: 3306/tcp
+        permanent: true
+        zone: public
+        state: enabled
+    -
+      name: reload firewalld
+      systemd:
+        name: firewalld
+        state: reloaded
+    -
+      name: create ecomdb
+      mysql_db:
+        name: ecomdb
+        state: present
+    -
+      name: create db user
+      mysql_user:
+        name: 'ec@{{item}}'
+        password: ecompassword
+        priv: "'ec@{{item}}'.*:ALL,GRANT"
+        state: present
+      loop:
+        - server-ip
+        - server-ip
+    -
+      name: copy the data
+      copy:
+        src: /home/ec2-user/db-load-script.sql
+        dest: /home/ec2-user/db-load-script.sql
+    -
+      name: importing tables data
+      mysql_db:
+        name: ecomdb
+        state: import
+        target: /home/ec2-user/db-load-script.sql
+
+
